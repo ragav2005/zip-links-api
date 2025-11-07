@@ -20,6 +20,20 @@ const errorMiddleware = (err, req, res, next) => {
       error.statusCode = 400;
     }
 
+    // JWT errors
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Expired token",
+      });
+    }
+
+    if (err.name === "JsonWebTokenError") {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token signature",
+      });
+    }
     // Mongoose validation error
     if (err.name === "ValidationError") {
       const message = Object.values(err.errors).map((val) => val.message);
