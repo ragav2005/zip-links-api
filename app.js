@@ -3,6 +3,7 @@ import { PORT } from "./config/env.js";
 import connectDB from "./config/db.js";
 import authRouter from "./routes/auth.route.js";
 import userRouter from "./routes/user.route.js";
+import urlRouter from "./routes/url.route.js";
 import errorMiddleware from "./middlewares/error.middleware.js";
 import cors from "cors";
 
@@ -18,7 +19,7 @@ app.use(
 );
 
 app.get("/", (req, res) => {
-  res.send({ msg: "Hello, World!" });
+  res.send({ msg: `zip-links api is running.` });
 });
 
 app.use(express.json({ limit: "50mb" }));
@@ -26,6 +27,7 @@ app.use(express.urlencoded({ limit: "50mb" }));
 
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
+app.use("/api/url", urlRouter);
 
 app.use(errorMiddleware);
 

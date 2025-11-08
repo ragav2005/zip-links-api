@@ -1,10 +1,15 @@
-import jwt from "jsonwebtoken";
-import { JWT_SECRET } from "../config/env.js";
+import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
 
 export const getUser = async (req, res, next) => {
+  const id = req.params.id;
+  if (!id) {
+    return res
+      .status(400)
+      .json({ success: false, message: "User ID is required" });
+  }
   try {
-    const user = await User.findById(req.params.id).select("-password");
+    const user = await User.findById(id).select("-password");
 
     if (!user) {
       const error = new Error("User not found");
@@ -19,20 +24,9 @@ export const getUser = async (req, res, next) => {
 };
 
 export const verifyToken = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(" ")[1];
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: "Access token required",
-    });
-  }
+  const user = req.user;
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.userId).select("-password");
-
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -51,19 +45,13 @@ export const verifyToken = async (req, res, next) => {
 };
 
 export const updateUser = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(" ")[1];
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: "Access token required",
-    });
-  }
+  const user = req.user;
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const userId = decoded.userId;
+    const userId = user._id;
 
     const { name, avatar } = req.body;
 
@@ -90,12 +78,17 @@ export const updateUser = async (req, res, next) => {
       });
     }
 
+    await session.commitTransaction();
+    session.endSession();
+
     res.status(200).json({
       success: true,
       message: "User updated successfully",
       data: updatedUser,
     });
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     next(err);
   }
 };
