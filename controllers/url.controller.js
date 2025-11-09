@@ -8,9 +8,19 @@ export const shortenURL = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
-  const { defaultUrl, title, customAlias } = req.body;
+  const { defaultUrl, title, customAlias, linkType } = req.body;
   const userId = req.user._id;
   try {
+    if (!linkType || !["normal", "geo"].includes(linkType)) {
+      return res
+        .status(400)
+        .json({ msg: 'A valid linkType ("normal" or "geo") is required.' });
+    }
+
+    if (linkType === "geo" && !title) {
+      return res.status(400).json({ msg: "Title is required for Geo-Urls." });
+    }
+
     if (!defaultUrl || !validator.isURL(defaultUrl)) {
       return res
         .status(400)
@@ -43,15 +53,17 @@ export const shortenURL = async (req, res, next) => {
       creator: userId,
       shortCode: shortCode,
       defaultUrl: defaultUrl,
-      title: title || "",
-      geoRules: [],
+      linkType: linkType,
+      title: linkType === "geo" ? title : null,
+      geoRules: linkType === "geo" ? [] : null,
     });
 
     await newUrl.save({ session });
 
-    const message = title
-      ? `You created a new Geo-Url: ${title} (${shortCode})`
-      : `You created a new link: ${shortCode}`;
+    const message =
+      linkType === "geo"
+        ? `You created a new Geo-Url: ${title} (${shortCode})`
+        : `You created a new link: ${shortCode}`;
 
     Activity.create({
       userId: userId,
@@ -79,6 +91,80 @@ export const shortenURL = async (req, res, next) => {
         .status(400)
         .json({ msg: "That alias was just taken. Try again." });
     }
+    next(error);
+  }
+};
+
+export const getUrls = async (req, res, next) => {
+  try {
+    const urls = await Url.find({
+      creator: req.user.id,
+      linkType: "normal",
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      message: "URLs fetched successfully",
+      data: urls,
+    });
+  } catch (error) {
+    console.error(error.message);
+    next(error);
+  }
+};
+
+export const getGeoUrls = async (req, res, next) => {
+  try {
+    const geoUrls = await Url.find({
+      creator: req.user.id,
+      linkType: "geo",
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      message: "Geo-URLs fetched successfully",
+      data: geoUrls,
+    });
+  } catch (error) {
+    console.error(error.message);
+    next(error);
+  }
+};
+
+export const deleteUrl = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const urlId = req.params.id;
+    const userId = req.user._id;
+
+    const url = await Url.findOne({ _id: urlId, creator: userId }).session(
+      session
+    );
+    if (!url) {
+      return res.status(404).json({ message: "URL not found." });
+    }
+
+    await Url.deleteOne({ _id: urlId, creator: userId }).session(session);
+
+    Activity.create({
+      userId: userId,
+      eventType: "URL_DELETED",
+      message: `You deleted the link: ${url.shortCode}`,
+      relatedUrlId: url._id,
+    }).catch((err) => {
+      console.error("Failed to log URL deletion activity:", err);
+    });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res
+      .status(200)
+      .json({ success: true, message: "URL deleted successfully.", data: url });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     next(error);
   }
 };

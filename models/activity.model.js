@@ -9,7 +9,7 @@ const activitySchema = new mongoose.Schema({
   },
   eventType: {
     type: String,
-    required: true,
+    required: true, //URL_CREATED, GEO_RULE_CREATED, GEO_RULE_UPDATED, GEO_RULE_DELETED, URL_DELETED.
   },
   message: {
     type: String,

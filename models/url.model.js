@@ -8,6 +8,12 @@ const urlSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    linkType: {
+      type: String,
+      required: true,
+      enum: ["normal", "geo"],
+      default: "normal",
+    },
     shortCode: {
       type: String,
       required: true,
@@ -22,7 +28,6 @@ const urlSchema = new mongoose.Schema(
     title: {
       type: String,
       trim: true,
-      default: "",
     },
     geoRules: [
       {
