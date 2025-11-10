@@ -14,11 +14,13 @@ export const shortenURL = async (req, res, next) => {
     if (!linkType || !["normal", "geo"].includes(linkType)) {
       return res
         .status(400)
-        .json({ msg: 'A valid linkType ("normal" or "geo") is required.' });
+        .json({ message: 'A valid linkType ("normal" or "geo") is required.' });
     }
 
     if (linkType === "geo" && !title) {
-      return res.status(400).json({ msg: "Title is required for Geo-Urls." });
+      return res
+        .status(400)
+        .json({ message: "Title is required for Geo-Urls." });
     }
 
     if (!defaultUrl || !validator.isURL(defaultUrl)) {
@@ -89,7 +91,7 @@ export const shortenURL = async (req, res, next) => {
     if (error.code === 11000) {
       return res
         .status(400)
-        .json({ msg: "That alias was just taken. Try again." });
+        .json({ message: "That alias was just taken. Try again." });
     }
     next(error);
   }
@@ -166,5 +168,127 @@ export const deleteUrl = async (req, res, next) => {
     await session.abortTransaction();
     session.endSession();
     next(error);
+  }
+};
+
+export const addGeoRule = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  const { country, destinationUrl, countryCode } = req.body;
+  const urlId = req.params.id;
+  const userId = req.user.id;
+
+  try {
+    if (
+      !country ||
+      !countryCode ||
+      !destinationUrl ||
+      !validator.isURL(destinationUrl)
+    ) {
+      return res.status(400).json({
+        message:
+          "Please provide a valid country, country code, and destination URL.",
+      });
+    }
+
+    const url = await Url.findById(urlId);
+    if (!url) {
+      return res.status(404).json({ message: "URL not found." });
+    }
+
+    if (url.creator.toString() !== userId) {
+      return res.status(401).json({ message: "User not authorized." });
+    }
+    if (url.linkType !== "geo") {
+      return res
+        .status(400)
+        .json({ message: "Rules can only be added to geo-links." });
+    }
+
+    url.geoRules.find((rule) => rule.countryCode === countryCode);
+    if (
+      url.geoRules.some(
+        (rule) => rule.country === country || rule.countryCode === countryCode
+      )
+    ) {
+      return res
+        .status(400)
+        .json({ message: "A rule for this country already exists." });
+    }
+
+    const newRule = { country, destinationUrl, countryCode };
+    url.geoRules.push(newRule);
+
+    await url.save();
+    await session.commitTransaction();
+    session.endSession();
+
+    Activity.create({
+      userId: userId,
+      eventType: "GEO_RULE_CREATED",
+      message: `Added geo-rule for ${country} to link ${url.shortCode}`,
+      relatedUrlId: url._id,
+    }).catch((err) => console.error("Failed to log activity:", err));
+
+    res.status(201).json({
+      success: true,
+      message: "Geo-rule added successfully",
+      data: url.geoRules,
+    });
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error(err.message);
+    next(err);
+  }
+};
+
+export const removeGeoRule = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  const { id: urlId, rule_id: ruleId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const url = await Url.findById(urlId);
+    if (!url) {
+      return res.status(404).json({ message: "URL not found." });
+    }
+
+    if (url.creator.toString() !== userId) {
+      return res.status(401).json({ message: "User not authorized." });
+    }
+
+    console.log("Rule ID to remove:", ruleId);
+    const rule = url.geoRules.id(ruleId);
+    if (!rule) {
+      return res.status(404).json({ message: "Rule not found." });
+    }
+    const country = rule.country;
+
+    url.geoRules.pull({ _id: ruleId });
+
+    await url.save();
+    await session.commitTransaction();
+    session.endSession();
+
+    Activity.create({
+      userId: userId,
+      eventType: "GEO_RULE_DELETED",
+      message: `Removed geo-rule for ${country} from link ${url.shortCode}`,
+      relatedUrlId: url._id,
+    }).catch((err) => console.error("Failed to log activity:", err));
+
+    res.status(200).json({
+      success: true,
+      message: "Rule deleted successfully.",
+      data: url.geoRules,
+    });
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error(err.message);
+    next(err);
   }
 };
