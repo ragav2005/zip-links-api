@@ -260,7 +260,6 @@ export const removeGeoRule = async (req, res, next) => {
       return res.status(401).json({ message: "User not authorized." });
     }
 
-    console.log("Rule ID to remove:", ruleId);
     const rule = url.geoRules.id(ruleId);
     if (!rule) {
       return res.status(404).json({ message: "Rule not found." });

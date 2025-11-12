@@ -4,11 +4,14 @@ import connectDB from "./config/db.js";
 import authRouter from "./routes/auth.route.js";
 import userRouter from "./routes/user.route.js";
 import urlRouter from "./routes/url.route.js";
+import RedirectRouter from "./routes/redirect.route.js";
 import errorMiddleware from "./middlewares/error.middleware.js";
 import cors from "cors";
 
 const app = express();
 connectDB();
+
+app.set("trust proxy", 1);
 
 app.use(
   cors({
@@ -28,7 +31,7 @@ app.use(express.urlencoded({ limit: "50mb" }));
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
 app.use("/api/url", urlRouter);
-
+app.use("/api", RedirectRouter);
 app.use(errorMiddleware);
 
 app.listen(PORT, () => {

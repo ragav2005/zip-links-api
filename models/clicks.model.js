@@ -27,6 +27,7 @@ const clickSchema = new mongoose.Schema({
     default: false,
   },
   geo: {
+    countryCode: { type: String },
     country: { type: String },
     region: { type: String },
   },
