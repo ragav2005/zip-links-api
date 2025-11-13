@@ -152,11 +152,3 @@ zipLinks/
 ├── .env                  # Environment variables (not committed)
 └── README.md             # This file
 ```
-
-## License
-
-This project is licensed under the MIT License.
-
-## Author
-
-ragav2005
