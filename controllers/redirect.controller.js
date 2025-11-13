@@ -12,7 +12,7 @@ export const RedirectUrl = async (req, res, next) => {
     }
 
     // ip look out
-    const ip = req.ip.includes("127.0.0.1") ? "157.50.9.23" : req.ip;
+    const ip = req.ip.includes("127.0.0.1") ? "157.51.67.172" : req.ip;
     let geoData = { countryCode: null, country: null, region: null };
     try {
       const geoResponse = await axios.get(
@@ -23,6 +23,7 @@ export const RedirectUrl = async (req, res, next) => {
         country: geoResponse.data.country,
         region: geoResponse.data.regionName,
       };
+      console.log("geoData:", geoData);
     } catch (geoError) {
       throw new Error("Geo-lookup failed:", geoError.message);
     }
@@ -33,12 +34,15 @@ export const RedirectUrl = async (req, res, next) => {
     let matchedRuleId = null;
 
     if (url.linkType === "geo" && url.geoRules.length > 0 && geoData.country) {
-      const rule = url.geoRules.find((r) => r.country === geoData.country);
+      const rule = url.geoRules.find(
+        (r) => r.countryCode === geoData.countryCode
+      );
       if (rule) {
         destinationUrl = rule.destinationUrl;
         wasGeoRedirect = true;
         matchedRuleId = rule._id;
       }
+      console.log("rule:", rule);
     }
 
     if (
